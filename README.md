@@ -1,8 +1,3 @@
-当然可以！以下是添加了 MIT License 声明的完整 README.md 文件，包含许可证摘要和标准引用方式，符合开源规范：
-
-✅ README.md
-
-markdown
 短链接生成服务（Short URL Service）
 
 这是一个基于 Cloudflare Workers + KV 的轻量级短链接生成服务。
