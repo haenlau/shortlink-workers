@@ -1,78 +1,108 @@
-短链接生成服务（Short URL Service）
+使用 Cloudflare Workers + KV 快速搭建短链接服务
 
-这是一个基于 Cloudflare Workers + KV 的轻量级短链接生成服务。
-提供网页界面（公开）和 API 接口（带 Token 验证），适合个人或小团队快速部署自己的短链系统。
-💡 无需服务器，免费托管，全球加速！
+本指南适用于 Cloudflare 免费账户用户。
 
-🛠 部署前修改项
+功能特性
+支持通过 Web 界面生成短链接（公开接口）
+提供带 Token 鉴权的 API 接口（用于程序调用）
+基于 Cloudflare KV 存储长/短链接映射
+自动 302 跳转
+完全兼容免费账户（无需付费）
 
-在部署之前，请完成以下配置：
-1. 替换域名占位符
-在 worker.js 中搜索 YOUR_DOMAIN，将其替换为你实际绑定的自定义域名（例如：s.example.com）：
-HTML title 和 favicon 链接
-JavaScript 中拼接 shortUrl 的地方
-所有返回 shortUrl 的 API 响应
-示例：https://YOUR_DOMAIN/abc123 → https://s.yourdomain.com/abc123
-2. 配置 Cloudflare Worker
-创建 KV Namespace
-名称建议为 URLS（可在 [Cloudflare Dashboard → Workers & Pages → KV](https://dash.cloudflare.com) 创建）
-绑定 KV 到 Worker
-在 Worker 编辑页 → Settings → Variables and Secrets → KV Namespace Bindings
-Variable name: URLS
-Namespace: 选择你刚创建的 URLS
-添加 Secret
-在 Secrets 区域添加：
+源码已开源，JavaScript 核心逻辑文件请参考项目仓库中的 [index.js](https://github.com/haenlau/shortlink-workers/blob/main/index.js)。
+
+部署步骤
+第一步：创建 Worker
+
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. 左侧菜单点击 Workers 和 Pages
+3. 点击右上角 + 添加 → 选择 Worker
+4. 输入服务名称（如 short-url-service），选择 从 Hello World 开始，点击 部署
+记下分配的默认地址：https://short-url-service.workers.dev
+
+第二步：创建 KV 命名空间
+
+1. 在左侧菜单中，展开 存储和数据库
+2. 点击 Workers KV
+3. 点击 创建命名空间
+4. 输入名称：URLS，点击 创建
+
+第三步：绑定 KV 到 Worker
+
+1. 返回您的 Worker 详情页
+2. 在 绑定 区域点击 + 绑定
+3. 类型选择 KV 命名空间
+4. 选择刚创建的 URLS 命名空间
+5. 设置变量名为 URLS
+6. 点击 添加绑定
+成功后，Worker 即可通过 env.URLS 访问该 KV 存储。
+
+第四步：配置 API 密钥（用于受控接口）
+
+1. 在 Worker 页面顶部点击 设置
+2. 找到 变量 区域，点击 添加变量
+3. 填写：
 Key: API_TOKEN
-Value: 你自定义的密钥（如 my-secret-12345），用于保护 /api/create 接口
-3. 绑定自定义域名（可选但推荐）
-在 Worker Triggers → Routes 中添加：YOUR_DOMAIN/*
-并在 Cloudflare DNS 中将该域名 CNAME 到你的 .workers.dev 子域
-4. （可选）替换 favicon
-将 HTML 中的：
-html
-<link rel="icon" type="image/png" href="https://YOUR_DOMAIN/favicon.png" />
+Value: 任意高强度随机字符串（如 x7G!kL9@qP2mNvR5）
+类型: 密钥（Secret）
+4. 点击 保存
+此密钥将用于保护 /api/create 接口，请勿泄露。
 
-替换为你自己的图标地址，或删除该行使用默认。
+第五步：部署代码
 
-🧪 使用方式
-网页版（公开）
-访问你的域名（如 https://s.example.com），输入长链接，点击“生成”即可获得短链接。
-API 调用（需 Token）
-bash
-curl -X POST https://s.example.com/api/create \
--H "Authorization: Bearer your-api-token" \
+1. 在 Worker 页面点击 编辑代码
+2. 清空默认代码，粘贴项目仓库中的 [index.js](https://github.com/your-username/short-url-worker/blob/main/index.js) 内容
+3. 关键修改：将代码中所有 <your-domain> 替换为您的实际访问域名：
+若使用默认域名：short-url-service.workers.dev
+若使用自定义域名（如 go.example.com）：请确保已在 DNS 中解析并绑定到此 Worker
+4. 点击右上角 部署
+
+第六步：测试服务
+访问 Web 界面
+打开浏览器访问：
+
+https://short-url-service.workers.dev
+
+测试公开 API（无需认证）
+```bash
+curl -X POST https://short-url-service.workers.dev/api/create-public \
 -H "Content-Type: application/json" \
--d '{"longUrl":"https://github.com","shortCode":"gh"}'
-返回：{"ok":true,"shortUrl":"https://s.example.com/gh"}
+-d '{"longUrl":"https://example.com","shortCode":"test123"}'
+```
+测试受控 API（需 Token）
+```bash
+curl -X POST https://short-url-service.workers.dev/api/create \
+-H "Authorization: Bearer your-api-token-here" \
+-H "Content-Type: application/json" \
+-d '{"longUrl":"https://example.com","shortCode":"secure456"}'
+```
+测试跳转
+访问：
 
-📦 技术栈
-Runtime: Cloudflare Workers (Edge)
-Storage: Cloudflare KV
-Frontend: Vanilla HTML/JS (零依赖)
-Security: Bearer Token 验证（仅限 API）
+https://short-url-service.workers.dev/test123
 
-📄 许可证（License）
+应自动重定向至 https://example.com
 
-本项目采用 MIT 许可证
+自定义域名
+
+1. 在您的域名提供商处添加一条 CNAME 记录：
+名称：go（或其他子域）
+目标：short-url-service.workers.dev
+2. 在 Cloudflare DNS 设置中确保该记录由 Cloudflare 代理（橙色云图标）
+3. 返回 Worker 的 绑定 页面，点击 + 绑定 → 自定义域名
+4. 输入 go.yourdomain.com 并按指引完成验证
+完成后，将 index.js 中的 <your-domain> 替换为 go.yourdomain.com
+
+安全与维护建议
+公开接口 (/api/create-public) 可能被滥用，建议在生产环境中限制或关闭
+定期轮换 API_TOKEN
+可通过 Cloudflare Logs 查看请求日志（需启用）
+如需更高安全性，可结合 Cloudflare Access 或 Rate Limiting（高级功能）
+
+开源许可
+
+本项目采用 MIT 许可证。
 
 MIT License
 
-Copyright (c) 2025 [Your Name or Organization]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+项目地址：[https://github.com/haenlau/shortlink-workers](https://github.com/your-username/short-url-worker)
