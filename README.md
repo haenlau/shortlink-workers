@@ -89,10 +89,4 @@ curl -X POST https://go.yourdomain.com/api/create \
   -d '{"longUrl":"https://example.com","shortCode":"xyz789"}'
 ```
 
-开源许可
-
-本项目采用 MIT 许可证。
-
 项目地址：https://github.com/haenlau/shortlink-workers
-
-Demo 地址：https://go.air1.cn
